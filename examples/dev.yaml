@@ -1,0 +1,9 @@
+apiVersion: aws-auth.controlant.com/v1
+kind: MapRole
+metadata:
+  name: test-mr
+spec:
+  rolearn: test-role
+  username: test-user
+  groups:
+  - system:masters

@@ -40,6 +40,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "env_logger",
+ "futures-util",
  "json-patch",
  "k8s-openapi",
  "kube",
@@ -47,6 +48,8 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "serde_yaml",
+ "thiserror",
  "tokio",
 ]
 
