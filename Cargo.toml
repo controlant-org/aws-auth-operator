@@ -2,6 +2,14 @@
 name = "aws-auth-operator"
 version = "0.1.0"
 edition = "2021"
+default-run = "operator"
+
+[lib]
+name = "operator"
+path = "src/lib.rs"
+
+[profile.release]
+lto = true
 
 [dependencies]
 # error handling

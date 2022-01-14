@@ -8,24 +8,12 @@ use kube::{
     controller::{self, Context, Controller, ReconcilerAction},
     finalizer,
   },
-  Client, CustomResource, CustomResourceExt, Resource,
+  Client, Resource,
 };
 use log::{debug, error, info};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Map a role in AWS IAM to Kubernetes groups
-#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
-#[kube(group = "aws-auth.controlant.com", version = "v1", kind = "MapRole", namespaced)]
-pub struct MapRoleSpec {
-  /// ARN of the AWS Role
-  rolearn: String,
-  /// Username inside kube
-  username: String,
-  /// Groups in kube
-  groups: Vec<String>,
-}
+use operator::{MapRole, MapRoleSpec};
 
 #[derive(Debug, Error)]
 enum AppError {
@@ -38,8 +26,6 @@ enum AppError {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
   env_logger::init();
-
-  println!("{}", serde_yaml::to_string(&MapRole::crd()).unwrap());
 
   // try load from env var which Terraform uses
   let client = match Client::try_default().await {
@@ -63,11 +49,7 @@ async fn main() -> anyhow::Result<()> {
     }
   };
 
-  // MAYBE: apply CRD
-
   let crd = Api::<MapRole>::all(client.clone());
-
-  //   reconcile_all_on
 
   Controller::new(crd, ListParams::default())
     .run(
