@@ -5,12 +5,13 @@ use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
   api::{Api, ListParams, Patch, PatchParams},
   runtime::{
-    controller::{self, Context, Controller, ReconcilerAction},
+    controller::{self, Action, Context, Controller},
     finalizer,
   },
   Client, Resource,
 };
 use log::{debug, error, info};
+use std::{sync::Arc, time::Duration};
 use thiserror::Error;
 
 use operator::{MapRole, MapRoleSpec};
@@ -70,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
           .await
         }
       },
-      |_, _| requeue(60),
+      |_, _| Action::requeue(Duration::from_secs(60)),
       Context::new(client),
     )
     .for_each(|res| async move {
@@ -91,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn apply(mr: MapRole, api: &Api<ConfigMap>) -> Result<ReconcilerAction, AppError> {
+async fn apply(mr: Arc<MapRole>, api: &Api<ConfigMap>) -> Result<Action, AppError> {
   let aws_auth_cm = api.get("aws-auth").await?;
   let cm_maproles_str = aws_auth_cm.data.as_ref().unwrap().get("mapRoles").unwrap();
   let mut cm_maproles: Vec<MapRoleSpec> = serde_yaml::from_str(cm_maproles_str)?;
@@ -99,10 +100,10 @@ async fn apply(mr: MapRole, api: &Api<ConfigMap>) -> Result<ReconcilerAction, Ap
   if let Some(mut entry) = cm_maproles.iter_mut().find(|e| e.rolearn == mr.spec.rolearn) {
     if (entry.username != mr.spec.username) || (entry.groups != mr.spec.groups) {
       // update existing entry
-      entry.username = mr.spec.username;
-      entry.groups = mr.spec.groups;
+      entry.username = mr.spec.username.clone();
+      entry.groups = mr.spec.groups.clone();
     } else {
-      return Ok(requeue(300));
+      return Ok(Action::requeue(Duration::from_secs(60)));
     }
   } else {
     // add new entry
@@ -126,10 +127,10 @@ async fn apply(mr: MapRole, api: &Api<ConfigMap>) -> Result<ReconcilerAction, Ap
     )
     .await?;
 
-  Ok(requeue(300))
+  Ok(Action::requeue(Duration::from_secs(300)))
 }
 
-async fn cleanup(mr: MapRole, api: &Api<ConfigMap>) -> Result<ReconcilerAction, AppError> {
+async fn cleanup(mr: Arc<MapRole>, api: &Api<ConfigMap>) -> Result<Action, AppError> {
   let aws_auth_cm = api.get("aws-auth").await?;
   let cm_maproles_str = aws_auth_cm.data.as_ref().unwrap().get("mapRoles").unwrap();
   let mut cm_maproles: Vec<MapRoleSpec> = serde_yaml::from_str(cm_maproles_str)?;
@@ -159,14 +160,5 @@ async fn cleanup(mr: MapRole, api: &Api<ConfigMap>) -> Result<ReconcilerAction, 
       .await?;
   }
 
-  Ok(requeue(0))
-}
-
-fn requeue(secs: u64) -> ReconcilerAction {
-  match secs {
-    0 => ReconcilerAction { requeue_after: None },
-    t => ReconcilerAction {
-      requeue_after: Some(std::time::Duration::from_secs(t)),
-    },
-  }
+  Ok(Action::await_change())
 }
