@@ -5,7 +5,7 @@ use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
   api::{Api, ListParams, Patch, PatchParams},
   runtime::{
-    controller::{self, Action, Context, Controller},
+    controller::{self, Action, Controller},
     finalizer,
   },
   Client, Resource,
@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
       |maprole, ctx| {
         debug!("Reconcile for: {:?}", &maprole);
 
-        let client = ctx.get_ref().clone();
+        let client = ctx.as_ref();
         let namespace = maprole.meta().namespace.as_deref().unwrap();
         let mr_api = Api::<MapRole>::namespaced(client.clone(), &namespace);
         let sys_api = Api::<ConfigMap>::namespaced(client.clone(), "kube-system");
@@ -72,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
         }
       },
       |_, _| Action::requeue(Duration::from_secs(60)),
-      Context::new(client),
+      Arc::new(client),
     )
     .for_each(|res| async move {
       match res {
