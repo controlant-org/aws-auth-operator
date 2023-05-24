@@ -3,10 +3,10 @@ use futures_util::StreamExt;
 use json_patch::{PatchOperation, ReplaceOperation, TestOperation};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-  api::{Api, ListParams, Patch, PatchParams},
+  api::{Api, Patch, PatchParams},
   runtime::{
     controller::{self, Action, Controller},
-    finalizer,
+    finalizer, watcher,
   },
   Client, Resource,
 };
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
 
   let crd = Api::<MapRole>::all(client.clone());
 
-  Controller::new(crd, ListParams::default())
+  Controller::new(crd, watcher::Config::default())
     .run(
       |maprole, ctx| {
         debug!("Reconcile for: {:?}", &maprole);
@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
           .await
         }
       },
-      |_, _| Action::requeue(Duration::from_secs(60)),
+      |_, _, _| Action::requeue(Duration::from_secs(60)),
       Arc::new(client),
     )
     .for_each(|res| async move {
