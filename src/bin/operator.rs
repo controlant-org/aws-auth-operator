@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 
         let client = ctx.as_ref();
         let namespace = maprole.meta().namespace.as_deref().unwrap();
-        let mr_api = Api::<MapRole>::namespaced(client.clone(), &namespace);
+        let mr_api = Api::<MapRole>::namespaced(client.clone(), namespace);
         let sys_api = Api::<ConfigMap>::namespaced(client.clone(), "kube-system");
         async move {
           finalizer::finalizer(&mr_api, "aws-auth-operator.controlant.com", maprole, |ev| async {
@@ -97,7 +97,7 @@ async fn apply(mr: Arc<MapRole>, api: &Api<ConfigMap>) -> Result<Action, AppErro
   let cm_maproles_str = aws_auth_cm.data.as_ref().unwrap().get("mapRoles").unwrap();
   let mut cm_maproles: Vec<MapRoleSpec> = serde_yaml::from_str(cm_maproles_str)?;
 
-  if let Some(mut entry) = cm_maproles.iter_mut().find(|e| e.rolearn == mr.spec.rolearn) {
+  if let Some(entry) = cm_maproles.iter_mut().find(|e| e.rolearn == mr.spec.rolearn) {
     if (entry.username != mr.spec.username) || (entry.groups != mr.spec.groups) {
       // update existing entry
       entry.username = mr.spec.username.clone();
